@@ -13,16 +13,18 @@ export const generateInsights = async (data: DataItem[]): Promise<string> => {
     return response.text || "No insights generated.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Failed to generate insights.";
+    throw error; // Propagate error
   }
 };
 
 export const generatePreReportAnalysis = async (data: DataItem[], columns: ColumnDef[]): Promise<string> => {
   try {
     const response = await api.preReportAnalysis(data, columns);
-    return response.text || "Analysis failed.";
+    if (!response.text) throw new Error("No analysis generated");
+    return response.text;
   } catch (error) {
-    return "Could not perform pre-analysis.";
+    console.error("Pre-Analysis Error:", error);
+    throw error;
   }
 };
 
@@ -32,7 +34,7 @@ export const suggestReportTemplates = async (data: DataItem[], columns: ColumnDe
     return response.templates || [];
   } catch (error) {
     console.error("Template Suggestion Error", error);
-    return [];
+    throw error;
   }
 };
 
@@ -66,19 +68,22 @@ export const smartPlaceVisual = async (reportContent: string, visualDescription:
 export const generateExecutiveReport = async (data: DataItem[], userInstructions: string = ''): Promise<string> => {
   try {
     const response = await api.generateReport(data, userInstructions);
-    return response.text || "Could not generate report.";
+    if (!response.text) throw new Error("No report generated");
+    return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Error generating report.";
+    throw error;
   }
 };
 
 export const generateDeepAnalysis = async (data: DataItem[], columns: ColumnDef[]): Promise<string> => {
   try {
     const response = await api.deepAnalysis(data, columns);
-    return response.text || "Analysis failed.";
+    if (!response.text) throw new Error("No analysis generated");
+    return response.text;
   } catch (error) {
-    return "Deep analysis unavailable.";
+    console.error("Deep Analysis Error:", error);
+    throw error;
   }
 }
 
@@ -90,7 +95,8 @@ export const suggestPivotConfiguration = async (columns: ColumnDef[]): Promise<P
     }
     return null;
   } catch (error) {
-    return null;
+    console.error("Pivot Suggest Error:", error);
+    throw error;
   }
 }
 
@@ -100,7 +106,7 @@ export const generatePivotSuggestions = async (columns: ColumnDef[]): Promise<Pi
     return response.suggestions || [];
   } catch (error) {
     console.error(error);
-    return [];
+    throw error;
   }
 }
 

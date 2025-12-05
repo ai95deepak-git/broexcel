@@ -201,9 +201,14 @@ const MainApp: React.FC = () => {
     setAnalysisResult(""); // Clear previous
     setIsAiThinking(true);
 
-    const result = await generateDeepAnalysis(data, columns);
-    setAnalysisResult(result);
-    setIsAiThinking(false);
+    try {
+      const result = await generateDeepAnalysis(data, columns);
+      setAnalysisResult(result);
+    } catch (e) {
+      setAnalysisResult("An error occurred during analysis. Please try again.");
+    } finally {
+      setIsAiThinking(false);
+    }
   };
 
   const handleFixGrammar = async () => {
@@ -224,9 +229,20 @@ const MainApp: React.FC = () => {
   const handleStartAnalysis = async () => {
     if (data.length === 0) return;
     setIsAiThinking(true);
-    const analysis = await generatePreReportAnalysis(data, columns);
-    setPreReportAnalysis(analysis);
-    setIsAiThinking(false);
+    try {
+      const analysis = await generatePreReportAnalysis(data, columns);
+      setPreReportAnalysis(analysis);
+    } catch (e) {
+      const aiMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'model',
+        text: 'I encountered an issue starting the analysis. Please try again.',
+        timestamp: new Date()
+      };
+      setChatHistory(prev => [...prev, aiMsg]);
+    } finally {
+      setIsAiThinking(false);
+    }
   };
 
   const handleResetReport = () => {
@@ -244,18 +260,29 @@ const MainApp: React.FC = () => {
   const handleGenerateFullReport = async (instructions: string) => {
     if (data.length === 0) return;
     setIsAiThinking(true);
-    const fullReport = await generateExecutiveReport(data, instructions);
-    setReportContent(fullReport);
-    setReportStage('drafting');
-    setIsAiThinking(false);
+    try {
+      const fullReport = await generateExecutiveReport(data, instructions);
+      setReportContent(fullReport);
+      setReportStage('drafting');
 
-    const aiMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'model',
-      text: 'I have generated your custom executive report based on the provided instructions.',
-      timestamp: new Date()
-    };
-    setChatHistory(prev => [...prev, aiMsg]);
+      const aiMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'model',
+        text: 'I have generated your custom executive report based on the provided instructions.',
+        timestamp: new Date()
+      };
+      setChatHistory(prev => [...prev, aiMsg]);
+    } catch (e) {
+      const aiMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'model',
+        text: 'I failed to generate the report. Please try refining your data or instructions.',
+        timestamp: new Date()
+      };
+      setChatHistory(prev => [...prev, aiMsg]);
+    } finally {
+      setIsAiThinking(false);
+    }
   };
 
   const handleExportPPT = async () => {

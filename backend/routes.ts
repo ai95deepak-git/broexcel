@@ -15,15 +15,35 @@ const ai = new GoogleGenAI({ apiKey });
 const modelId = 'gemini-1.5-flash';
 
 // Helper to clean JSON response
+// Helper to clean JSON response
 const cleanJson = (text: string) => {
-    let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const firstOpen = cleaned.search(/[\{\[]/);
-    const lastClose = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+    try {
+        // Remove markdown code blocks if present
+        let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-        return cleaned.substring(firstOpen, lastClose + 1);
+        // Find the first '[' or '{'
+        const firstOpenBrace = cleaned.indexOf('{');
+        const firstOpenBracket = cleaned.indexOf('[');
+
+        let start = -1;
+        if (firstOpenBrace !== -1 && firstOpenBracket !== -1) {
+            start = Math.min(firstOpenBrace, firstOpenBracket);
+        } else {
+            start = Math.max(firstOpenBrace, firstOpenBracket);
+        }
+
+        // Find the last ']' or '}'
+        const lastCloseBrace = cleaned.lastIndexOf('}');
+        const lastCloseBracket = cleaned.lastIndexOf(']');
+        const end = Math.max(lastCloseBrace, lastCloseBracket);
+
+        if (start !== -1 && end !== -1 && end > start) {
+            return cleaned.substring(start, end + 1);
+        }
+        return cleaned;
+    } catch (e) {
+        return text; // Return original if something goes wrong
     }
-    return cleaned;
 };
 
 if (!apiKey) {
@@ -31,6 +51,9 @@ if (!apiKey) {
 } else {
     console.log("API_KEY is configured.");
 }
+
+// --- Auth Routes ---
+
 
 // --- Auth Routes ---
 
@@ -299,7 +322,10 @@ router.post('/analyze/report', async (req: Request, res: Response): Promise<void
             contents: prompt
         });
 
-        res.json({ text: response.text });
+        const text = response.text;
+        if (!text) throw new Error("Empty response from AI");
+
+        res.json({ text });
     } catch (error: any) {
         console.error("Report Gen Error:", error);
         res.status(500).json({ error: "Failed to generate report" });
@@ -401,7 +427,7 @@ router.post('/analyze/pivot', async (req: Request, res: Response): Promise<void>
             console.log("Pivot Raw AI Response:", text);
             const suggestions = JSON.parse(cleanJson(text));
 
-            if (!Array.isArray(suggestions) || suggestions.length === 0) throw new Error("Empty or invalid AI response");
+            if (!Array.isArray(suggestions) || suggestions.length === 0) throw new Error("AI returned empty or invalid JSON");
 
             res.json({ suggestions });
 
@@ -496,7 +522,7 @@ router.post('/analyze/templates', async (req: Request, res: Response): Promise<v
             console.log("Template Raw AI Response:", text);
             const templates = JSON.parse(cleanJson(text));
 
-            if (!Array.isArray(templates) || templates.length === 0) throw new Error("Empty or invalid AI response");
+            if (!Array.isArray(templates) || templates.length === 0) throw new Error("AI returned empty or invalid JSON");
 
             res.json({ templates });
         } catch (aiError) {
