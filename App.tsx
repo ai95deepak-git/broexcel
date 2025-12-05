@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AppState, AppView, ChatMessage, DataItem, ReportChart, ColumnDef, ReportStage, PivotConfig } from './types';
 import { INITIAL_DATA, INITIAL_REPORT, INITIAL_COLUMNS, SAMPLE_DATA, SAMPLE_COLUMNS, SAMPLE_REPORT } from './constants';
@@ -13,10 +12,13 @@ import ImageMapper from './components/ImageMapper';
 import { chatWithData, improveWriting, generateDataForQuery, generateExecutiveReport, generateDeepAnalysis, suggestPivotConfiguration, generatePreReportAnalysis } from './services/geminiService';
 import { exportToPPT } from './services/pptService';
 import { parseExcelFile } from './services/fileService';
-import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, FileType } from 'lucide-react';
+import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, FileType, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from './services/api';
 import { Save, Cloud } from 'lucide-react';
+import { AuthProvider, useAuth } from './components/auth/AuthContext';
+import { LoginPage } from './components/auth/LoginPage';
+import { SignupPage } from './components/auth/SignupPage';
 
 // Lazy load heavy components
 const PivotTable = React.lazy(() => import('./components/PivotTable'));
@@ -29,7 +31,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const App: React.FC = () => {
+const AuthenticatedApp: React.FC = () => {
   // Global State
   const [data, setData] = useState<DataItem[]>(INITIAL_DATA);
   const [columns, setColumns] = useState<ColumnDef[]>(INITIAL_COLUMNS);
@@ -51,6 +53,8 @@ const App: React.FC = () => {
   // Deep Analysis Modal State
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState("");
+
+  const { logout, user } = useAuth();
 
   // Handlers
   const handleLoadSample = () => {
@@ -387,6 +391,14 @@ const App: React.FC = () => {
             >
               {isRailOpen ? <ChevronRight size={20} /> : <MessageSquare size={20} />}
             </button>
+            <div className="w-px h-6 bg-slate-200 mx-1"></div>
+            <button
+              onClick={logout}
+              className="p-2.5 rounded-lg transition-all duration-200 border border-transparent text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+              title="Sign Out"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </header>
 
@@ -495,6 +507,29 @@ const App: React.FC = () => {
         onToggle={() => setIsRailOpen(!isRailOpen)}
       />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AuthWrapper />
+    </AuthProvider>
+  );
+};
+
+const AuthWrapper: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  const [isLogin, setIsLogin] = useState(true);
+
+  if (isAuthenticated) {
+    return <AuthenticatedApp />;
+  }
+
+  return isLogin ? (
+    <LoginPage onSwitchToSignup={() => setIsLogin(false)} />
+  ) : (
+    <SignupPage onSwitchToLogin={() => setIsLogin(true)} />
   );
 };
 
