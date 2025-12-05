@@ -8,6 +8,7 @@ interface SignupPageProps {
 }
 
 export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
@@ -36,7 +37,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignu
             const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, mobile, password }),
+                body: JSON.stringify({ email, mobile, password, name }),
             });
 
             const data = await response.json();
@@ -73,6 +74,21 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignu
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Full Name</label>
+                        <div className="relative group">
+                            <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="John Doe"
+                                required
+                            />
+                        </div>
+                    </div>
+
                     <div className="space-y-1.5">
                         <label className="block text-sm font-semibold text-slate-700 ml-1">Email Address</label>
                         <div className="relative group">

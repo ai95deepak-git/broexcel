@@ -5,9 +5,10 @@ import { LayoutGrid, Loader2, User, Lock, LogIn, CheckCircle2 } from 'lucide-rea
 interface LoginPageProps {
     onSwitchToSignup: () => void;
     onLoginSuccess?: () => void;
+    onForgotPassword: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginSuccess, onForgotPassword }) => {
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -108,6 +109,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginS
                                     required
                                 />
                             </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                onClick={onForgotPassword}
+                                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium hover:underline"
+                            >
+                                Forgot Password?
+                            </button>
                         </div>
 
                         <button

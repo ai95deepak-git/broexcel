@@ -24,8 +24,8 @@ export interface PivotConfig {
 export interface ReportChart {
   id: string;
   type: 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'radar' | 'pivot';
-  dataKey?: string;   
-  xAxisKey?: string;  
+  dataKey?: string;
+  xAxisKey?: string;
   title: string;
   pivotConfig?: PivotConfig;
 }
@@ -52,7 +52,10 @@ export enum AppView {
   REPORT = 'REPORT',
   HISTORY = 'HISTORY',
   PDF_CONVERTER = 'PDF_CONVERTER',
-  IMAGE_MAPPER = 'IMAGE_MAPPER'
+  IMAGE_MAPPER = 'IMAGE_MAPPER',
+  WORKSPACE = 'WORKSPACE',
+  SETTINGS = 'SETTINGS',
+  ACTIVITY = 'ACTIVITY'
 }
 
 export type ReportStage = 'analysis' | 'drafting';

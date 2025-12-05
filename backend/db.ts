@@ -1,69 +1,77 @@
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import sqlite3 from 'sqlite3';
 
-dotenv.config();
 
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
+const dbPath = './broexcel.db';
+
+export const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Could not connect to database', err);
+  } else {
+    console.log('Connected to SQLite database');
+  }
+});
+
+export const query = (text: string, params: any[] = []) => {
+  return new Promise<any>((resolve, reject) => {
+    // Convert $1, $2 to ? for SQLite
+    // Note: This is a simple regex and might need refinement for complex cases
+    // But for this app, it should be enough if we just pass params in order
+    // However, sqlite3 uses ? or $name.
+    // We will assume the caller updates the query to use ? or we handle it here.
+    // Actually, it's safer to update routes.ts to use ?
+
+    if (text.trim().toUpperCase().startsWith('SELECT')) {
+      db.all(text, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve({ rows });
+      });
+    } else {
+      db.run(text, params, function (err) {
+        if (err) reject(err);
+        else resolve({ rows: [], rowCount: this.changes, lastID: this.lastID });
+      });
     }
-    : {
-      user: process.env.DB_USER || 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      database: process.env.DB_NAME || 'broexcel',
-      password: process.env.DB_PASS || 'password',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      ssl: process.env.DB_SSL === 'false' ? false : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false)
-    }
-);
-
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+  });
+};
 
 export const initDb = async () => {
-  let retries = 5;
-  while (retries) {
-    try {
-      await pool.query('SELECT NOW()');
-      console.log('Database connected successfully');
+  const run = (sql: string) => new Promise<void>((resolve, reject) => {
+    db.run(sql, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 
-      await pool.query(`
-                CREATE TABLE IF NOT EXISTS datasets (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    data TEXT NOT NULL,
-                    columns TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
+  try {
+    await run(`CREATE TABLE IF NOT EXISTS datasets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            data TEXT NOT NULL,
+            columns TEXT NOT NULL,
+            user_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`);
 
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email TEXT UNIQUE NOT NULL,
-                    mobile_number TEXT UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                
-                -- Migration for existing tables
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='mobile_number') THEN
-                        ALTER TABLE users ADD COLUMN mobile_number TEXT UNIQUE;
-                    END IF;
-                END $$;
-            `);
-      console.log('Tables initialized');
-      break;
-    } catch (err) {
-      console.error('Database connection failed, retrying...', err);
-      retries -= 1;
-      await new Promise(res => setTimeout(res, 5000));
-    }
-  }
-  if (!retries) {
-    console.error('Could not connect to database after multiple retries');
-    process.exit(1);
+    await run(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            mobile_number TEXT UNIQUE,
+            name TEXT,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+    await run(`CREATE TABLE IF NOT EXISTS otp_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            code TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`);
+
+    console.log('Tables initialized (SQLite)');
+  } catch (err) {
+    console.error('Error initializing tables', err);
   }
 };
 

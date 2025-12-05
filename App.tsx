@@ -12,7 +12,10 @@ import ImageMapper from './components/ImageMapper';
 import { chatWithData, improveWriting, generateDataForQuery, generateExecutiveReport, generateDeepAnalysis, suggestPivotConfiguration, generatePreReportAnalysis } from './services/geminiService';
 import { exportToPPT } from './services/pptService';
 import { parseExcelFile } from './services/fileService';
-import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, Save, LogIn, LogOut } from 'lucide-react';
+import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, Save, LogIn, LogOut, User, Settings as SettingsIcon, FolderOpen, Activity } from 'lucide-react';
+import Workspace from './components/Workspace';
+import Settings from './components/Settings';
+import ActivityView from './components/ActivityView';
 import { api } from './services/api';
 import { AuthProvider, useAuth } from './components/auth/AuthContext';
 import { AuthModal } from './components/auth/AuthModal';
@@ -54,6 +57,7 @@ const MainApp: React.FC = () => {
   // Auth State
   const { isAuthenticated, logout, user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [datasetName, setDatasetName] = useState(""); // Add state for dataset name if needed, or prompt user
 
   // Handlers
@@ -324,6 +328,22 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const handleOpenWorkspaceItem = (data: DataItem[], columns: ColumnDef[]) => {
+    setData(data);
+    setColumns(columns);
+    setReportCharts([]);
+    setReportContent("");
+    setReportStage('analysis');
+    setView(AppView.SPREADSHEET);
+    const aiMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'model',
+      text: `I've opened your saved dataset. You can now analyze it.`,
+      timestamp: new Date()
+    };
+    setChatHistory(prev => [...prev, aiMsg]);
+  };
+
   const NavButton = ({ targetView, icon: Icon, label }: { targetView: AppView, icon: any, label: string }) => (
     <button
       onClick={() => setView(targetView)}
@@ -407,20 +427,45 @@ const MainApp: React.FC = () => {
             {/* Auth Buttons */}
             <div className="flex items-center gap-4">
               {isAuthenticated ? (
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
-                      {user?.email[0].toUpperCase()}
-                    </div>
-                    <span className="text-sm font-medium hidden md:block">{user?.email}</span>
-                  </div>
+                <div className="relative">
                   <button
-                    onClick={logout}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    title="Log Out"
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 text-slate-600 hover:bg-slate-50 p-1.5 rounded-lg transition-colors"
                   >
-                    <LogOut size={20} />
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
+                      {user?.name ? user.name[0].toUpperCase() : user?.email[0].toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium hidden md:block">
+                      Hi, {user?.name ? user.name.split(' ')[0] : 'User'}
+                    </span>
                   </button>
+
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                      <div className="px-4 py-2 border-b border-slate-50 mb-2">
+                        <p className="text-sm font-semibold text-slate-800">Hi, {user?.name ? user.name.split(' ')[0] : 'User'}</p>
+                      </div>
+
+                      <button onClick={() => { setView(AppView.WORKSPACE); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-blue-600 flex items-center gap-2">
+                        <FolderOpen size={16} /> My Workspace
+                      </button>
+                      <button onClick={() => { setView(AppView.ACTIVITY); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-orange-600 flex items-center gap-2">
+                        <Activity size={16} /> Activity
+                      </button>
+                      <button onClick={() => { setView(AppView.HISTORY); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-purple-600 flex items-center gap-2">
+                        <History size={16} /> History
+                      </button>
+                      <button onClick={() => { setView(AppView.SETTINGS); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2">
+                        <SettingsIcon size={16} /> Settings
+                      </button>
+
+                      <div className="border-t border-slate-50 mt-2 pt-2">
+                        <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                          <LogOut size={16} /> Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
@@ -446,6 +491,7 @@ const MainApp: React.FC = () => {
                 onNavigate={setView}
                 onUpload={handleFileUpload}
                 onLoadSample={handleLoadSample}
+                onLogin={() => setShowAuthModal(true)}
               />
             )}
             {view === AppView.SPREADSHEET && (
@@ -518,6 +564,21 @@ const MainApp: React.FC = () => {
             {view === AppView.IMAGE_MAPPER && (
               <div className="h-full p-2 md:p-6 max-w-6xl mx-auto flex flex-col">
                 <ImageMapper onBack={() => setView(AppView.HOME)} />
+              </div>
+            )}
+            {view === AppView.WORKSPACE && (
+              <div className="h-full p-2 md:p-6 w-full flex flex-col overflow-y-auto">
+                <Workspace onOpen={handleOpenWorkspaceItem} />
+              </div>
+            )}
+            {view === AppView.SETTINGS && (
+              <div className="h-full p-2 md:p-6 w-full flex flex-col overflow-y-auto">
+                <Settings />
+              </div>
+            )}
+            {view === AppView.ACTIVITY && (
+              <div className="h-full p-2 md:p-6 w-full flex flex-col overflow-y-auto">
+                <ActivityView />
               </div>
             )}
           </div>

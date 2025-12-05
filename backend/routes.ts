@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import multer from 'multer';
-import db from './db';
+import db, { query } from './db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -12,7 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // In production
 // Initialize Gemini
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
-const modelId = 'gemini-2.5-flash';
+const modelId = 'gemini-1.5-flash';
 
 // Helper to clean JSON response
 const cleanJson = (text: string) => {
@@ -24,16 +24,16 @@ const cleanJson = (text: string) => {
 // Register
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, mobile } = req.body;
-        console.log(`[Register Attempt] Email: ${email}, Mobile: ${mobile}`);
+        const { email, password, mobile, name } = req.body;
+        console.log(`[Register Attempt] Email: ${email}, Mobile: ${mobile}, Name: ${name}`);
 
         if ((!email && !mobile) || !password) {
             return res.status(400).json({ error: 'Email/Mobile and password are required' });
         }
 
         // Check if user exists (by email or mobile)
-        const userCheck = await db.query(
-            'SELECT * FROM users WHERE email = $1 OR mobile_number = $2',
+        const userCheck = await query(
+            'SELECT * FROM users WHERE email = ? OR mobile_number = ?',
             [email || '', mobile || '']
         );
 
@@ -47,15 +47,16 @@ router.post('/register', async (req, res) => {
         const hash = await bcrypt.hash(password, salt);
 
         // Create user
-        const newUser = await db.query(
-            'INSERT INTO users (email, mobile_number, password_hash) VALUES ($1, $2, $3) RETURNING id, email, mobile_number, created_at',
-            [email, mobile, hash]
+        const result = await query(
+            'INSERT INTO users (email, mobile_number, password_hash, name) VALUES (?, ?, ?, ?)',
+            [email, mobile, hash, name]
         );
 
-        const user = newUser.rows[0];
-        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+        const userId = result.lastID;
+        const user = { id: userId, email, mobile_number: mobile, name };
+        const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '24h' });
 
-        console.log(`[Register Success] User created: ${user.email} (ID: ${user.id})`);
+        console.log(`[Register Success] User created: ${email} (ID: ${userId})`);
         res.status(201).json({ user, token });
     } catch (error) {
         console.error('Register error:', error);
@@ -70,9 +71,9 @@ router.post('/login', async (req, res) => {
         console.log(`[Login Attempt] Identifier: ${identifier}`);
 
         // Find user by email OR mobile
-        const result = await db.query(
-            'SELECT * FROM users WHERE email = $1 OR mobile_number = $1',
-            [identifier]
+        const result = await query(
+            'SELECT * FROM users WHERE email = ? OR mobile_number = ?',
+            [identifier, identifier]
         );
 
         if (result.rows.length === 0) {
@@ -93,12 +94,82 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
         res.json({
-            user: { id: user.id, email: user.email, mobile: user.mobile_number, created_at: user.created_at },
+            user: { id: user.id, email: user.email, mobile: user.mobile_number, name: user.name, created_at: user.created_at },
             token
         });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Forgot Password (Public)
+router.post('/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        // Check if user exists
+        const userCheck = await query('SELECT * FROM users WHERE email = ?', [email]);
+        if (userCheck.rows.length === 0) {
+            // Don't reveal if user exists or not for security, but for dev we log it
+            console.log(`[Forgot Password] Email not found: ${email}`);
+            return res.json({ success: true, message: "If an account exists, an OTP has been sent." });
+        }
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Save OTP
+        await query(
+            'INSERT INTO otp_codes (email, code, expires_at) VALUES (?, ?, ?)',
+            [email, code, expiresAt]
+        );
+
+        console.log(`[OTP SENT] To: ${email}, Code: ${code}`);
+        res.json({ success: true, message: "OTP sent successfully" });
+    } catch (err) {
+        console.error("Forgot Password Error:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+});
+
+// Reset Password (Public)
+router.post('/auth/reset-password', async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Verify OTP
+        const otpResult = await query(
+            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            [email, otp, new Date().toISOString()]
+        );
+
+        if (otpResult.rows.length === 0) {
+            return res.status(400).json({ error: "Invalid or expired OTP" });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        const updateResult = await query('UPDATE users SET password_hash = ? WHERE email = ?', [hash, email]);
+
+        if (updateResult.rowCount === 0) {
+            return res.status(400).json({ error: "User not found" });
+        }
+
+        // Clean up used OTPs
+        await query('DELETE FROM otp_codes WHERE email = ?', [email]);
+
+        res.json({ success: true, message: "Password reset successfully" });
+    } catch (err) {
+        console.error("Reset Password Error:", err);
+        res.status(500).json({ error: "Failed to reset password" });
     }
 });
 
@@ -109,7 +180,7 @@ router.get('/me', async (req, res) => {
         if (!token) return res.status(401).json({ error: 'No token provided' });
 
         const decoded = jwt.verify(token, JWT_SECRET) as any;
-        const result = await db.query('SELECT id, email, mobile_number, created_at FROM users WHERE id = $1', [decoded.id]);
+        const result = await query('SELECT id, email, mobile_number, name, created_at FROM users WHERE id = ?', [decoded.id]);
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
@@ -383,9 +454,25 @@ router.get('/', (req, res) => {
 
 // --- Data Persistence Routes ---
 
-router.get('/data', async (req, res) => {
+// Middleware to verify JWT
+const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+        if (err) return res.sendStatus(403);
+        req.user = { userId: user.id, email: user.email };
+        next();
+    });
+};
+
+// --- Data Persistence Routes ---
+
+router.get('/data', authenticateToken, async (req: any, res) => {
     try {
-        const result = await db.query('SELECT * FROM datasets ORDER BY created_at DESC');
+        const result = await query('SELECT * FROM datasets WHERE user_id = ? ORDER BY created_at DESC', [req.user.userId]);
         const parsed = result.rows.map((d: any) => ({
             ...d,
             data: JSON.parse(d.data),
@@ -398,17 +485,126 @@ router.get('/data', async (req, res) => {
     }
 });
 
-router.post('/data', async (req, res) => {
+router.post('/data', authenticateToken, async (req: any, res) => {
     const { name, data, columns } = req.body;
     try {
-        const result = await db.query(
-            'INSERT INTO datasets (name, data, columns) VALUES ($1, $2, $3) RETURNING id',
-            [name, JSON.stringify(data), JSON.stringify(columns)]
+        const result = await query(
+            'INSERT INTO datasets (name, data, columns, user_id) VALUES (?, ?, ?, ?)',
+            [name, JSON.stringify(data), JSON.stringify(columns), req.user.userId]
         );
-        res.json({ id: result.rows[0].id, success: true });
+        res.json({ id: result.lastID, success: true });
     } catch (err) {
         console.error("Save Error:", err);
         res.status(500).json({ error: "Failed to save dataset" });
+    }
+});
+
+router.put('/data/:id', authenticateToken, async (req: any, res) => {
+    const { id } = req.params;
+    const { name } = req.body;
+    try {
+        const result = await query(
+            'UPDATE datasets SET name = ? WHERE id = ? AND user_id = ?',
+            [name, id, req.user.userId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Dataset not found or unauthorized" });
+        }
+        res.json({ success: true, dataset: { id, name } });
+    } catch (err) {
+        console.error("Rename Error:", err);
+        res.status(500).json({ error: "Failed to rename dataset" });
+    }
+});
+
+router.delete('/data/:id', authenticateToken, async (req: any, res) => {
+    const { id } = req.params;
+    try {
+        const result = await query(
+            'DELETE FROM datasets WHERE id = ? AND user_id = ?',
+            [id, req.user.userId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: "Dataset not found or unauthorized" });
+        }
+        res.json({ success: true, id });
+    } catch (err) {
+        console.error("Delete Error:", err);
+        res.status(500).json({ error: "Failed to delete dataset" });
+    }
+});
+
+router.post('/auth/send-otp', authenticateToken, async (req: any, res) => {
+    try {
+        const { email } = req.user;
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Save OTP
+        await query(
+            'INSERT INTO otp_codes (email, code, expires_at) VALUES (?, ?, ?)',
+            [email, code, expiresAt]
+        );
+
+        // In a real app, send email here. For now, log it.
+        console.log(`[OTP SENT] To: ${email}, Code: ${code}`);
+
+        res.json({ success: true, message: "OTP sent successfully" });
+    } catch (err) {
+        console.error("Send OTP Error:", err);
+        res.status(500).json({ error: "Failed to send OTP" });
+    }
+});
+
+router.post('/auth/verify-otp', authenticateToken, async (req: any, res) => {
+    const { code } = req.body;
+    try {
+        const { email } = req.user;
+        const result = await query(
+            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            [email, code, new Date().toISOString()]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: "Invalid or expired OTP" });
+        }
+
+        res.json({ success: true, message: "OTP verified" });
+    } catch (err) {
+        console.error("Verify OTP Error:", err);
+        res.status(500).json({ error: "Failed to verify OTP" });
+    }
+});
+
+router.post('/auth/change-password', authenticateToken, async (req: any, res) => {
+    const { otp, newPassword } = req.body;
+    try {
+        const { email, userId } = req.user;
+
+        // Verify OTP again to be safe
+        const otpResult = await query(
+            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            [email, otp, new Date().toISOString()]
+        );
+
+        if (otpResult.rows.length === 0) {
+            return res.status(400).json({ error: "Invalid or expired OTP" });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        await query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId]);
+
+        // Clean up used OTPs
+        await query('DELETE FROM otp_codes WHERE email = ?', [email]);
+
+        res.json({ success: true, message: "Password updated successfully" });
+    } catch (err) {
+        console.error("Change Password Error:", err);
+        res.status(500).json({ error: "Failed to change password" });
     }
 });
 
