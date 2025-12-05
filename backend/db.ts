@@ -9,6 +9,7 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'broexcel',
   password: process.env.DB_PASS || 'password',
   port: parseInt(process.env.DB_PORT || '5432'),
+  ssl: process.env.DB_HOST !== 'localhost' ? { rejectUnauthorized: false } : undefined
 });
 
 export const query = (text: string, params: any[] = []) => {

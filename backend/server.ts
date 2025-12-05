@@ -61,8 +61,15 @@ app.get('*', (req, res) => {
 });
 
 // Initialize DB
+// Initialize DB
 initDb();
 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+// Export app for Vercel
+export { app };
+
+// Only listen if running directly (not imported as a module)
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+    });
+}
