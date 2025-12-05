@@ -25,6 +25,8 @@ const cleanJson = (text: string) => {
 router.post('/register', async (req, res) => {
     try {
         const { email, password, mobile } = req.body;
+        console.log(`[Register Attempt] Email: ${email}, Mobile: ${mobile}`);
+
         if ((!email && !mobile) || !password) {
             return res.status(400).json({ error: 'Email/Mobile and password are required' });
         }
@@ -36,6 +38,7 @@ router.post('/register', async (req, res) => {
         );
 
         if (userCheck.rows.length > 0) {
+            console.log(`[Register Failed] User already exists: ${email || mobile}`);
             return res.status(400).json({ error: 'User already exists with this email or mobile number' });
         }
 
@@ -52,6 +55,7 @@ router.post('/register', async (req, res) => {
         const user = newUser.rows[0];
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
+        console.log(`[Register Success] User created: ${user.email} (ID: ${user.id})`);
         res.status(201).json({ user, token });
     } catch (error) {
         console.error('Register error:', error);
@@ -63,6 +67,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { identifier, password } = req.body; // identifier can be email or mobile
+        console.log(`[Login Attempt] Identifier: ${identifier}`);
 
         // Find user by email OR mobile
         const result = await db.query(
@@ -71,14 +76,17 @@ router.post('/login', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
+            console.log(`[Login Failed] User not found for identifier: ${identifier}`);
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
         const user = result.rows[0];
+        console.log(`[Login Success] User found: ${user.email} (ID: ${user.id})`);
 
         // Check password
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
+            console.log(`[Login Failed] Password mismatch for user: ${user.email}`);
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
@@ -101,7 +109,7 @@ router.get('/me', async (req, res) => {
         if (!token) return res.status(401).json({ error: 'No token provided' });
 
         const decoded = jwt.verify(token, JWT_SECRET) as any;
-        const result = await db.query('SELECT id, email, created_at FROM users WHERE id = $1', [decoded.id]);
+        const result = await db.query('SELECT id, email, mobile_number, created_at FROM users WHERE id = $1', [decoded.id]);
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
