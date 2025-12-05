@@ -33,7 +33,7 @@ router.post('/register', async (req, res) => {
 
         // Check if user exists (by email or mobile)
         const userCheck = await query(
-            'SELECT * FROM users WHERE email = ? OR mobile_number = ?',
+            'SELECT * FROM users WHERE email = $1 OR mobile_number = $2',
             [email || '', mobile || '']
         );
 
@@ -48,11 +48,11 @@ router.post('/register', async (req, res) => {
 
         // Create user
         const result = await query(
-            'INSERT INTO users (email, mobile_number, password_hash, name) VALUES (?, ?, ?, ?)',
+            'INSERT INTO users (email, mobile_number, password_hash, name) VALUES ($1, $2, $3, $4) RETURNING id',
             [email, mobile, hash, name]
         );
 
-        const userId = result.lastID;
+        const userId = result.rows[0].id;
         const user = { id: userId, email, mobile_number: mobile, name };
         const token = jwt.sign({ id: userId, email }, JWT_SECRET, { expiresIn: '24h' });
 
@@ -72,7 +72,7 @@ router.post('/login', async (req, res) => {
 
         // Find user by email OR mobile
         const result = await query(
-            'SELECT * FROM users WHERE email = ? OR mobile_number = ?',
+            'SELECT * FROM users WHERE email = $1 OR mobile_number = $2',
             [identifier, identifier]
         );
 
@@ -110,7 +110,7 @@ router.post('/auth/forgot-password', async (req, res) => {
         if (!email) return res.status(400).json({ error: 'Email is required' });
 
         // Check if user exists
-        const userCheck = await query('SELECT * FROM users WHERE email = ?', [email]);
+        const userCheck = await query('SELECT * FROM users WHERE email = $1', [email]);
         if (userCheck.rows.length === 0) {
             // Don't reveal if user exists or not for security, but for dev we log it
             console.log(`[Forgot Password] Email not found: ${email}`);
@@ -122,7 +122,7 @@ router.post('/auth/forgot-password', async (req, res) => {
 
         // Save OTP
         await query(
-            'INSERT INTO otp_codes (email, code, expires_at) VALUES (?, ?, ?)',
+            'INSERT INTO otp_codes (email, code, expires_at) VALUES ($1, $2, $3)',
             [email, code, expiresAt]
         );
 
@@ -144,7 +144,7 @@ router.post('/auth/reset-password', async (req, res) => {
 
         // Verify OTP
         const otpResult = await query(
-            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            'SELECT * FROM otp_codes WHERE email = $1 AND code = $2 AND expires_at > $3 ORDER BY created_at DESC LIMIT 1',
             [email, otp, new Date().toISOString()]
         );
 
@@ -157,14 +157,14 @@ router.post('/auth/reset-password', async (req, res) => {
         const hash = await bcrypt.hash(newPassword, salt);
 
         // Update password
-        const updateResult = await query('UPDATE users SET password_hash = ? WHERE email = ?', [hash, email]);
+        const updateResult = await query('UPDATE users SET password_hash = $1 WHERE email = $2', [hash, email]);
 
         if (updateResult.rowCount === 0) {
             return res.status(400).json({ error: "User not found" });
         }
 
         // Clean up used OTPs
-        await query('DELETE FROM otp_codes WHERE email = ?', [email]);
+        await query('DELETE FROM otp_codes WHERE email = $1', [email]);
 
         res.json({ success: true, message: "Password reset successfully" });
     } catch (err) {
@@ -180,7 +180,7 @@ router.get('/me', async (req, res) => {
         if (!token) return res.status(401).json({ error: 'No token provided' });
 
         const decoded = jwt.verify(token, JWT_SECRET) as any;
-        const result = await query('SELECT id, email, mobile_number, name, created_at FROM users WHERE id = ?', [decoded.id]);
+        const result = await query('SELECT id, email, mobile_number, name, created_at FROM users WHERE id = $1', [decoded.id]);
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
@@ -472,7 +472,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 
 router.get('/data', authenticateToken, async (req: any, res) => {
     try {
-        const result = await query('SELECT * FROM datasets WHERE user_id = ? ORDER BY created_at DESC', [req.user.userId]);
+        const result = await query('SELECT * FROM datasets WHERE user_id = $1 ORDER BY created_at DESC', [req.user.userId]);
         const parsed = result.rows.map((d: any) => ({
             ...d,
             data: JSON.parse(d.data),
@@ -489,10 +489,10 @@ router.post('/data', authenticateToken, async (req: any, res) => {
     const { name, data, columns } = req.body;
     try {
         const result = await query(
-            'INSERT INTO datasets (name, data, columns, user_id) VALUES (?, ?, ?, ?)',
+            'INSERT INTO datasets (name, data, columns, user_id) VALUES ($1, $2, $3, $4) RETURNING id',
             [name, JSON.stringify(data), JSON.stringify(columns), req.user.userId]
         );
-        res.json({ id: result.lastID, success: true });
+        res.json({ id: result.rows[0].id, success: true });
     } catch (err) {
         console.error("Save Error:", err);
         res.status(500).json({ error: "Failed to save dataset" });
@@ -504,7 +504,7 @@ router.put('/data/:id', authenticateToken, async (req: any, res) => {
     const { name } = req.body;
     try {
         const result = await query(
-            'UPDATE datasets SET name = ? WHERE id = ? AND user_id = ?',
+            'UPDATE datasets SET name = $1 WHERE id = $2 AND user_id = $3',
             [name, id, req.user.userId]
         );
         if (result.rowCount === 0) {
@@ -521,7 +521,7 @@ router.delete('/data/:id', authenticateToken, async (req: any, res) => {
     const { id } = req.params;
     try {
         const result = await query(
-            'DELETE FROM datasets WHERE id = ? AND user_id = ?',
+            'DELETE FROM datasets WHERE id = $1 AND user_id = $2',
             [id, req.user.userId]
         );
         if (result.rowCount === 0) {
@@ -542,7 +542,7 @@ router.post('/auth/send-otp', authenticateToken, async (req: any, res) => {
 
         // Save OTP
         await query(
-            'INSERT INTO otp_codes (email, code, expires_at) VALUES (?, ?, ?)',
+            'INSERT INTO otp_codes (email, code, expires_at) VALUES ($1, $2, $3)',
             [email, code, expiresAt]
         );
 
@@ -561,7 +561,7 @@ router.post('/auth/verify-otp', authenticateToken, async (req: any, res) => {
     try {
         const { email } = req.user;
         const result = await query(
-            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            'SELECT * FROM otp_codes WHERE email = $1 AND code = $2 AND expires_at > $3 ORDER BY created_at DESC LIMIT 1',
             [email, code, new Date().toISOString()]
         );
 
@@ -583,7 +583,7 @@ router.post('/auth/change-password', authenticateToken, async (req: any, res) =>
 
         // Verify OTP again to be safe
         const otpResult = await query(
-            'SELECT * FROM otp_codes WHERE email = ? AND code = ? AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+            'SELECT * FROM otp_codes WHERE email = $1 AND code = $2 AND expires_at > $3 ORDER BY created_at DESC LIMIT 1',
             [email, otp, new Date().toISOString()]
         );
 
@@ -596,10 +596,10 @@ router.post('/auth/change-password', authenticateToken, async (req: any, res) =>
         const hash = await bcrypt.hash(newPassword, salt);
 
         // Update password
-        await query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId]);
+        await query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
 
         // Clean up used OTPs
-        await query('DELETE FROM otp_codes WHERE email = ?', [email]);
+        await query('DELETE FROM otp_codes WHERE email = $1', [email]);
 
         res.json({ success: true, message: "Password updated successfully" });
     } catch (err) {
