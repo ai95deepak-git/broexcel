@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: broexcel_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: broexcel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASS=password
+      - DB_NAME=broexcel
+      - API_KEY=AIzaSyCD0NyZIAqsFBYdo-h51eFw2BBngSSXy4c
+      - DB_SSL=false
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
