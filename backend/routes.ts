@@ -306,6 +306,63 @@ router.post('/analyze/report', async (req: Request, res: Response): Promise<void
     }
 });
 
+// --- Fallback Generators ---
+
+const generateFallbackPivots = (columns: any[]) => {
+    const numericCols = columns.filter(c => c.type === 'number' || c.type === 'numeric').map(c => c.key);
+    const catCols = columns.filter(c => c.type === 'string' || c.type === 'text').map(c => c.key);
+
+    if (numericCols.length === 0 || catCols.length === 0) return [];
+
+    const suggestions = [];
+
+    // Suggestion 1: Simple Sum
+    if (catCols.length > 0 && numericCols.length > 0) {
+        suggestions.push({
+            title: `Sum of ${numericCols[0]} by ${catCols[0]}`,
+            description: `Analyze total ${numericCols[0]} across different ${catCols[0]} categories.`,
+            config: { rowKey: catCols[0], colKey: catCols.length > 1 ? catCols[1] : catCols[0], valueKey: numericCols[0], aggregation: 'sum' }
+        });
+    }
+
+    // Suggestion 2: Average
+    if (catCols.length > 0 && numericCols.length > 0) {
+        suggestions.push({
+            title: `Average ${numericCols[0]} by ${catCols[0]}`,
+            description: `See the average performance of ${numericCols[0]} for each ${catCols[0]}.`,
+            config: { rowKey: catCols[0], colKey: catCols.length > 1 ? catCols[1] : catCols[0], valueKey: numericCols[0], aggregation: 'average' }
+        });
+    }
+
+    return suggestions;
+};
+
+const generateFallbackTemplates = (columns: any[]) => {
+    return [
+        {
+            id: 'fallback_1',
+            title: 'General Data Overview',
+            description: 'A comprehensive summary of all key metrics and trends.',
+            instruction: 'Analyze the dataset generally, focusing on key performance indicators and outliers.',
+            icon: 'general'
+        },
+        {
+            id: 'fallback_2',
+            title: 'Performance Analysis',
+            description: 'Focus on high and low performing areas.',
+            instruction: 'Identify top and bottom performers based on numeric metrics.',
+            icon: 'trend'
+        },
+        {
+            id: 'fallback_3',
+            title: 'Financial / Numeric Audit',
+            description: 'Detailed breakdown of numeric values.',
+            instruction: 'Perform a detailed audit of all financial or numeric columns.',
+            icon: 'finance'
+        }
+    ];
+};
+
 router.post('/analyze/pivot', async (req: Request, res: Response): Promise<void> => {
     try {
         const { columns } = req.body;
@@ -332,24 +389,30 @@ router.post('/analyze/pivot', async (req: Request, res: Response): Promise<void>
             ]
         `;
 
-        const response = await ai.models.generateContent({
-            model: modelId,
-            contents: prompt
-        });
-
-        const text = response.text || "[]";
-        console.log("Pivot Raw AI Response:", text);
-
         try {
+            if (!apiKey) throw new Error("No API Key");
+
+            const response = await ai.models.generateContent({
+                model: modelId,
+                contents: prompt
+            });
+
+            const text = response.text || "[]";
+            console.log("Pivot Raw AI Response:", text);
             const suggestions = JSON.parse(cleanJson(text));
+
+            if (!Array.isArray(suggestions) || suggestions.length === 0) throw new Error("Empty or invalid AI response");
+
             res.json({ suggestions });
-        } catch (e) {
-            console.error("JSON Parse Error:", e);
-            res.status(500).json({ error: "Failed to parse AI response", raw: text });
+
+        } catch (aiError) {
+            console.warn("AI Pivot Failed, using fallback:", aiError);
+            const fallback = generateFallbackPivots(columns);
+            res.json({ suggestions: fallback });
         }
     } catch (error: any) {
-        console.error("Pivot Gen Error:", error);
-        res.status(500).json({ error: "AI generation failed" });
+        console.error("Pivot Route Error:", error);
+        res.status(500).json({ error: "Server error" });
     }
 });
 
@@ -378,6 +441,11 @@ router.post('/analyze/deep', async (req: Request, res: Response): Promise<void> 
         (Suggest 3 specific charts to create, e.g., "Bar chart of [Column A] vs [Column B]")
         `;
 
+        if (!apiKey) {
+            res.json({ text: "## Analysis Unavailable\n\nAI service is not configured. Please check your API key." });
+            return;
+        }
+
         const response = await ai.models.generateContent({
             model: modelId,
             contents: prompt
@@ -386,7 +454,7 @@ router.post('/analyze/deep', async (req: Request, res: Response): Promise<void> 
         res.json({ text: response.text });
     } catch (error: any) {
         console.error("Deep Analysis Error:", error);
-        res.status(500).json({ error: "Deep analysis failed" });
+        res.json({ text: "## Analysis Failed\n\nCould not generate analysis at this time." });
     }
 });
 
@@ -416,24 +484,29 @@ router.post('/analyze/templates', async (req: Request, res: Response): Promise<v
             ]
         `;
 
-        const response = await ai.models.generateContent({
-            model: modelId,
-            contents: prompt
-        });
-
-        const text = response.text || "[]";
-        console.log("Template Raw AI Response:", text);
-
         try {
+            if (!apiKey) throw new Error("No API Key");
+
+            const response = await ai.models.generateContent({
+                model: modelId,
+                contents: prompt
+            });
+
+            const text = response.text || "[]";
+            console.log("Template Raw AI Response:", text);
             const templates = JSON.parse(cleanJson(text));
+
+            if (!Array.isArray(templates) || templates.length === 0) throw new Error("Empty or invalid AI response");
+
             res.json({ templates });
-        } catch (e) {
-            console.error("JSON Parse Error:", e);
-            res.status(500).json({ error: "Failed to parse AI response", raw: text });
+        } catch (aiError) {
+            console.warn("AI Template Failed, using fallback:", aiError);
+            const fallback = generateFallbackTemplates(columns);
+            res.json({ templates: fallback });
         }
     } catch (error: any) {
-        console.error("Template Error:", error);
-        res.status(500).json({ error: "AI generation failed" });
+        console.error("Template Route Error:", error);
+        res.status(500).json({ error: "Server error" });
     }
 });
 
