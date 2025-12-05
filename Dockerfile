@@ -4,6 +4,7 @@ WORKDIR /app/frontend
 COPY package*.json ./
 RUN npm install
 COPY . .
+ARG NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Stage 2: Build Backend
