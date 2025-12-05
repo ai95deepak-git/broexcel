@@ -317,6 +317,7 @@ router.post('/analyze/pivot', async (req: Request, res: Response): Promise<void>
             
             Return a JSON array of objects strictly matching this schema.
             CRITICAL: Return ONLY the raw JSON. Do not use markdown code blocks. Do not add any introductory text.
+            The response must start with [ and end with ].
             [
               {
                 "title": "Title of the view",
@@ -338,10 +339,17 @@ router.post('/analyze/pivot', async (req: Request, res: Response): Promise<void>
 
         const text = response.text || "[]";
         console.log("Pivot Raw AI Response:", text);
-        res.json({ suggestions: JSON.parse(cleanJson(text)) });
+
+        try {
+            const suggestions = JSON.parse(cleanJson(text));
+            res.json({ suggestions });
+        } catch (e) {
+            console.error("JSON Parse Error:", e);
+            res.status(500).json({ error: "Failed to parse AI response", raw: text });
+        }
     } catch (error: any) {
         console.error("Pivot Gen Error:", error);
-        res.json({ suggestions: [] });
+        res.status(500).json({ error: "AI generation failed" });
     }
 });
 
@@ -396,6 +404,7 @@ router.post('/analyze/templates', async (req: Request, res: Response): Promise<v
             
             Return a JSON array of objects with this schema.
             CRITICAL: Return ONLY the raw JSON. Do not use markdown code blocks. Do not add any introductory text.
+            The response must start with [ and end with ].
             [
                 {
                     "id": "unique_string",
@@ -414,10 +423,17 @@ router.post('/analyze/templates', async (req: Request, res: Response): Promise<v
 
         const text = response.text || "[]";
         console.log("Template Raw AI Response:", text);
-        res.json({ templates: JSON.parse(cleanJson(text)) });
+
+        try {
+            const templates = JSON.parse(cleanJson(text));
+            res.json({ templates });
+        } catch (e) {
+            console.error("JSON Parse Error:", e);
+            res.status(500).json({ error: "Failed to parse AI response", raw: text });
+        }
     } catch (error: any) {
         console.error("Template Error:", error);
-        res.json({ templates: [] });
+        res.status(500).json({ error: "AI generation failed" });
     }
 });
 
