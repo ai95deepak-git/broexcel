@@ -16,8 +16,21 @@ const modelId = 'gemini-1.5-flash';
 
 // Helper to clean JSON response
 const cleanJson = (text: string) => {
-    return text.replace(/```json/g, '').replace(/```/g, '').trim();
+    let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const firstOpen = cleaned.search(/[\{\[]/);
+    const lastClose = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+        return cleaned.substring(firstOpen, lastClose + 1);
+    }
+    return cleaned;
 };
+
+if (!apiKey) {
+    console.warn("WARNING: API_KEY is not set in environment variables!");
+} else {
+    console.log("API_KEY is configured.");
+}
 
 // --- Auth Routes ---
 
