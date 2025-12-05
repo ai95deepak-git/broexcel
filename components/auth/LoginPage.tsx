@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
-import { LayoutGrid, Loader2 } from 'lucide-react';
+import { LayoutGrid, Loader2, User, Lock, LogIn, CheckCircle2 } from 'lucide-react';
 
 interface LoginPageProps {
     onSwitchToSignup: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup }) => {
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
     const { login } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -22,7 +23,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup }) => {
             const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ identifier, password }),
             });
 
             const data = await response.json();
@@ -31,67 +32,98 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup }) => {
                 throw new Error(data.error || 'Login failed');
             }
 
-            login(data.token, data.user);
+            // Show success state briefly
+            setSuccess(true);
+            setTimeout(() => {
+                login(data.token, data.user);
+            }, 1500); // Wait 1.5s to show welcome message
+
         } catch (err: any) {
             setError(err.message);
-        } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-slate-100">
-                <div className="flex flex-col items-center mb-8">
-                    <div className="w-12 h-12 bg-gradient-to-tr from-emerald-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg mb-4">
-                        <LayoutGrid className="text-white w-7 h-7" />
+    if (success) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
+                <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500">
+                    <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-6 animate-bounce">
+                        <CheckCircle2 className="text-white w-10 h-10" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">Welcome Back</h2>
-                    <p className="text-slate-500">Sign in to continue to BroExcel</p>
+                    <h2 className="text-3xl font-bold text-slate-800">Welcome Back!</h2>
+                    <p className="text-slate-500 mt-2">Redirecting to your dashboard...</p>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
+            <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/50 animate-in fade-in zoom-in duration-300">
+                <div className="flex flex-col items-center mb-8">
+                    <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mb-4 transform hover:rotate-12 transition-transform duration-300">
+                        <LayoutGrid className="text-white w-8 h-8" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Welcome Back</h2>
+                    <p className="text-slate-500 mt-2">Sign in to continue to BroExcel</p>
                 </div>
 
                 {error && (
-                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+                    <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 flex items-center gap-2 animate-in slide-in-from-top-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                            placeholder="you@example.com"
-                            required
-                        />
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Email or Mobile Number</label>
+                        <div className="relative group">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="text"
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="you@example.com or +1234567890"
+                                required
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                            placeholder="••••••••"
-                            required
-                        />
+
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Password</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 mt-2"
                     >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sign In'}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                            <>
+                                <span>Sign In</span>
+                                <LogIn className="w-5 h-5" />
+                            </>
+                        )}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-slate-500">
+                <div className="mt-8 text-center text-sm text-slate-500">
                     Don't have an account?{' '}
-                    <button onClick={onSwitchToSignup} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                    <button onClick={onSwitchToSignup} className="text-emerald-600 hover:text-emerald-700 font-bold hover:underline underline-offset-2 transition-all">
                         Sign up
                     </button>
                 </div>

@@ -40,9 +40,18 @@ export const initDb = async () => {
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     email TEXT UNIQUE NOT NULL,
+                    mobile_number TEXT UNIQUE,
                     password_hash TEXT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+                
+                -- Migration for existing tables
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='mobile_number') THEN
+                        ALTER TABLE users ADD COLUMN mobile_number TEXT UNIQUE;
+                    END IF;
+                END $$;
             `);
       console.log('Tables initialized');
       break;

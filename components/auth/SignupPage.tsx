@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
-import { LayoutGrid, Loader2 } from 'lucide-react';
+import { LayoutGrid, Loader2, Smartphone, Mail, Lock, UserPlus } from 'lucide-react';
 
 interface SignupPageProps {
     onSwitchToLogin: () => void;
@@ -8,6 +8,7 @@ interface SignupPageProps {
 
 export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
     const [email, setEmail] = useState('');
+    const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
@@ -34,7 +35,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
             const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, mobile, password }),
             });
 
             const data = await response.json();
@@ -52,69 +53,100 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-slate-100">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
+            <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/50 animate-in fade-in zoom-in duration-300">
                 <div className="flex flex-col items-center mb-8">
-                    <div className="w-12 h-12 bg-gradient-to-tr from-emerald-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg mb-4">
-                        <LayoutGrid className="text-white w-7 h-7" />
+                    <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mb-4 transform hover:rotate-12 transition-transform duration-300">
+                        <LayoutGrid className="text-white w-8 h-8" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">Create Account</h2>
-                    <p className="text-slate-500">Join BroExcel today</p>
+                    <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Create Account</h2>
+                    <p className="text-slate-500 mt-2">Join BroExcel today</p>
                 </div>
 
                 {error && (
-                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+                    <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100 flex items-center gap-2 animate-in slide-in-from-top-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                            placeholder="you@example.com"
-                            required
-                        />
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Email Address</label>
+                        <div className="relative group">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="you@example.com"
+                                required
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                            placeholder="At least 6 characters"
-                            required
-                        />
+
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Mobile Number</label>
+                        <div className="relative group">
+                            <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="tel"
+                                value={mobile}
+                                onChange={(e) => setMobile(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="+1 234 567 8900"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                            placeholder="Repeat password"
-                            required
-                        />
+
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Password</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="At least 6 characters"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="block text-sm font-semibold text-slate-700 ml-1">Confirm Password</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors w-5 h-5" />
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                placeholder="Repeat password"
+                                required
+                            />
+                        </div>
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-bold py-3.5 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 mt-2"
                     >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Account'}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                            <>
+                                <span>Create Account</span>
+                                <UserPlus className="w-5 h-5" />
+                            </>
+                        )}
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-slate-500">
+                <div className="mt-8 text-center text-sm text-slate-500">
                     Already have an account?{' '}
-                    <button onClick={onSwitchToLogin} className="text-emerald-600 hover:text-emerald-700 font-medium">
+                    <button onClick={onSwitchToLogin} className="text-emerald-600 hover:text-emerald-700 font-bold hover:underline underline-offset-2 transition-all">
                         Sign in
                     </button>
                 </div>

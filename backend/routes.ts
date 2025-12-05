@@ -24,15 +24,19 @@ const cleanJson = (text: string) => {
 // Register
 router.post('/register', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+        const { email, password, mobile } = req.body;
+        if ((!email && !mobile) || !password) {
+            return res.status(400).json({ error: 'Email/Mobile and password are required' });
         }
 
-        // Check if user exists
-        const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        // Check if user exists (by email or mobile)
+        const userCheck = await db.query(
+            'SELECT * FROM users WHERE email = $1 OR mobile_number = $2',
+            [email || '', mobile || '']
+        );
+
         if (userCheck.rows.length > 0) {
-            return res.status(400).json({ error: 'User already exists' });
+            return res.status(400).json({ error: 'User already exists with this email or mobile number' });
         }
 
         // Hash password
@@ -41,8 +45,8 @@ router.post('/register', async (req, res) => {
 
         // Create user
         const newUser = await db.query(
-            'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
-            [email, hash]
+            'INSERT INTO users (email, mobile_number, password_hash) VALUES ($1, $2, $3) RETURNING id, email, mobile_number, created_at',
+            [email, mobile, hash]
         );
 
         const user = newUser.rows[0];
@@ -58,10 +62,14 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { identifier, password } = req.body; // identifier can be email or mobile
 
-        // Find user
-        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        // Find user by email OR mobile
+        const result = await db.query(
+            'SELECT * FROM users WHERE email = $1 OR mobile_number = $1',
+            [identifier]
+        );
+
         if (result.rows.length === 0) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
@@ -77,7 +85,7 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
 
         res.json({
-            user: { id: user.id, email: user.email, created_at: user.created_at },
+            user: { id: user.id, email: user.email, mobile: user.mobile_number, created_at: user.created_at },
             token
         });
     } catch (error) {
