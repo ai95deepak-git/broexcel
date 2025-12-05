@@ -4,9 +4,10 @@ import { LayoutGrid, Loader2, Smartphone, Mail, Lock, UserPlus } from 'lucide-re
 
 interface SignupPageProps {
     onSwitchToLogin: () => void;
+    onSignupSuccess?: () => void;
 }
 
-export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
+export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
     const [email, setEmail] = useState('');
     const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
@@ -45,6 +46,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
             }
 
             login(data.token, data.user);
+            if (onSignupSuccess) onSignupSuccess();
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -53,9 +55,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30">
-            <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/50 animate-in fade-in zoom-in duration-300">
-                <div className="flex flex-col items-center mb-8">
+        <div className="flex items-center justify-center bg-white p-4">
+            <div className="w-full max-w-md">
+                <div className="flex flex-col items-center mb-8 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/50 animate-in fade-in zoom-in duration-300">
                     <div className="w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg mb-4 transform hover:rotate-12 transition-transform duration-300">
                         <LayoutGrid className="text-white w-8 h-8" />
                     </div>

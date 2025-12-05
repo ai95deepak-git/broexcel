@@ -12,13 +12,10 @@ import ImageMapper from './components/ImageMapper';
 import { chatWithData, improveWriting, generateDataForQuery, generateExecutiveReport, generateDeepAnalysis, suggestPivotConfiguration, generatePreReportAnalysis } from './services/geminiService';
 import { exportToPPT } from './services/pptService';
 import { parseExcelFile } from './services/fileService';
-import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, FileType, LogOut } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { LayoutGrid, LayoutDashboard, FileText, MessageSquare, Home as HomeIcon, ChevronRight, BrainCircuit, Table, History, Grid, Save, LogIn, LogOut } from 'lucide-react';
 import { api } from './services/api';
-import { Save, Cloud } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/auth/AuthContext';
-import { LoginPage } from './components/auth/LoginPage';
-import { SignupPage } from './components/auth/SignupPage';
+import { AuthModal } from './components/auth/AuthModal';
 
 // Lazy load heavy components
 const PivotTable = React.lazy(() => import('./components/PivotTable'));
@@ -31,7 +28,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const AuthenticatedApp: React.FC = () => {
+const MainApp: React.FC = () => {
   // Global State
   const [data, setData] = useState<DataItem[]>(INITIAL_DATA);
   const [columns, setColumns] = useState<ColumnDef[]>(INITIAL_COLUMNS);
@@ -54,7 +51,10 @@ const AuthenticatedApp: React.FC = () => {
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState("");
 
-  const { logout, user } = useAuth();
+  // Auth State
+  const { isAuthenticated, logout, user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [datasetName, setDatasetName] = useState(""); // Add state for dataset name if needed, or prompt user
 
   // Handlers
   const handleLoadSample = () => {
@@ -97,14 +97,25 @@ const AuthenticatedApp: React.FC = () => {
         console.error("Failed to load data", e);
       }
     };
-    loadSavedData();
-  }, []);
+    // Only load saved data if authenticated
+    if (isAuthenticated) {
+      loadSavedData();
+    }
+  }, [isAuthenticated]);
 
   const handleSaveData = async () => {
-    if (data.length === 0) return;
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // Simple prompt for name for now, or use a default
+    const name = prompt("Enter a name for this dataset:", `Dataset ${new Date().toLocaleString()}`);
+    if (!name) return;
+
     setIsAiThinking(true);
     try {
-      await api.saveData(`Dataset ${new Date().toLocaleString()}`, data, columns);
+      await api.saveData(name, data, columns);
       const msg: ChatMessage = {
         id: Date.now().toString(),
         role: 'model',
@@ -392,15 +403,40 @@ const AuthenticatedApp: React.FC = () => {
               {isRailOpen ? <ChevronRight size={20} /> : <MessageSquare size={20} />}
             </button>
             <div className="w-px h-6 bg-slate-200 mx-1"></div>
-            <button
-              onClick={logout}
-              className="p-2.5 rounded-lg transition-all duration-200 border border-transparent text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
-              title="Sign Out"
-            >
-              <LogOut size={20} />
-            </button>
+
+            {/* Auth Buttons */}
+            <div className="flex items-center gap-4">
+              {isAuthenticated ? (
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
+                      {user?.email[0].toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium hidden md:block">{user?.email}</span>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Log Out"
+                  >
+                    <LogOut size={20} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <LogIn size={18} />
+                  <span>Sign In</span>
+                </button>
+              )}
+            </div>
+
           </div>
         </header>
+
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
         {/* Viewport */}
         <main className="flex-1 overflow-hidden relative bg-slate-50">
@@ -513,23 +549,8 @@ const AuthenticatedApp: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AuthWrapper />
+      <MainApp />
     </AuthProvider>
-  );
-};
-
-const AuthWrapper: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-
-  if (isAuthenticated) {
-    return <AuthenticatedApp />;
-  }
-
-  return isLogin ? (
-    <LoginPage onSwitchToSignup={() => setIsLogin(false)} />
-  ) : (
-    <SignupPage onSwitchToLogin={() => setIsLogin(true)} />
   );
 };
 
